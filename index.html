@@ -61,7 +61,7 @@ canvas { display:block; }
 <body>
 <div id="hud">
   <div>分數：<span id="sd">0</span></div>
-  <div>關卡：<span id="ld">1</span></div>
+  <div>關卡：<span id="ld">1/4</span></div>
   <div>命數：<span id="vd">❤️❤️❤️</span></div>
 </div>
 <canvas id="c"></canvas>
@@ -73,9 +73,7 @@ canvas { display:block; }
 </div>
 <div id="overlay">
   <h1>🟡 吃豆人</h1>
-  <p>吃掉所有豆子，躲開鬼魂！<br>
-  ⌨️ 方向鍵每按一下走一格<br>
-  📱 滑動或按下方按鈕</p>
+  <p>吃掉 80% 豆子過關，共四關<br>⌨️ 方向鍵每按一下走一格<br>📱 滑動或按下方按鈕</p>
   <button class="obtn" id="start-btn">開始遊戲</button>
 </div>
 
@@ -93,46 +91,44 @@ function resize() {
   canvas.height = TILE * ROWS;
 }
 
-// ── 地图 ──────────────────────────────────────────────────────────────────────
-// 0=空地, 1=墙, 2=豆, 3=大力豆, 4=鬼屋内部
-// 左右两端 col 0 和 col 20 只要不是1就可以穿越
-// 联通行：row 10（中间）和 row 6、row 18（上下各一条）
+// 0=空, 1=墙, 2=豆, 3=大力豆, 4=鬼屋
 const MAP_TEMPLATE = [
-//  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20
-  [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // 0
-  [ 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1], // 1
-  [ 1, 3, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 3, 1], // 2
-  [ 1, 2, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 2, 1], // 3
-  [ 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1], // 4
-  [ 1, 2, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2, 1], // 5
-  [ 0, 2, 2, 2, 2, 1, 2, 2, 2, 2, 1, 2, 2, 2, 2, 1, 2, 2, 2, 2, 0], // 6  ← 左右联通
-  [ 1, 1, 1, 1, 2, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 2, 1, 1, 1, 1], // 7
-  [ 1, 1, 1, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 1, 1, 1], // 8
-  [ 1, 1, 1, 1, 2, 1, 0, 1, 1, 4, 4, 4, 1, 1, 0, 1, 2, 1, 1, 1, 1], // 9
-  [ 0, 0, 0, 0, 2, 0, 0, 1, 4, 4, 4, 4, 4, 1, 0, 0, 2, 0, 0, 0, 0], // 10 ← 左右联通
-  [ 1, 1, 1, 1, 2, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 2, 1, 1, 1, 1], // 11
-  [ 1, 1, 1, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 1, 1, 1], // 12
-  [ 1, 1, 1, 1, 2, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 2, 1, 1, 1, 1], // 13
-  [ 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1], // 14
-  [ 1, 2, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 2, 1], // 15
-  [ 1, 3, 2, 1, 2, 2, 2, 2, 2, 2, 0, 2, 2, 2, 2, 2, 2, 1, 2, 3, 1], // 16
-  [ 1, 1, 2, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 2, 1, 1], // 17
-  [ 0, 2, 2, 2, 2, 1, 2, 2, 2, 2, 1, 2, 2, 2, 2, 1, 2, 2, 2, 2, 0], // 18 ← 左右联通
-  [ 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1], // 19
-  [ 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1], // 20
-  [ 1, 2, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 2, 1], // 21
-  [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // 22
+  [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+  [ 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],
+  [ 1, 3, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 3, 1],
+  [ 1, 2, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 2, 1],
+  [ 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],
+  [ 1, 2, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2, 1],
+  [ 0, 2, 2, 2, 2, 1, 2, 2, 2, 2, 1, 2, 2, 2, 2, 1, 2, 2, 2, 2, 0],
+  [ 1, 1, 1, 1, 2, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 2, 1, 1, 1, 1],
+  [ 1, 1, 1, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 1, 1, 1],
+  [ 1, 1, 1, 1, 2, 1, 0, 1, 1, 4, 4, 4, 1, 1, 0, 1, 2, 1, 1, 1, 1],
+  [ 0, 0, 0, 0, 2, 0, 0, 1, 4, 4, 4, 4, 4, 1, 0, 0, 2, 0, 0, 0, 0],
+  [ 1, 1, 1, 1, 2, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 2, 1, 1, 1, 1],
+  [ 1, 1, 1, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 1, 1, 1],
+  [ 1, 1, 1, 1, 2, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 2, 1, 1, 1, 1],
+  [ 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],
+  [ 1, 2, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 2, 1],
+  [ 1, 3, 2, 1, 2, 2, 2, 2, 2, 2, 0, 2, 2, 2, 2, 2, 2, 1, 2, 3, 1],
+  [ 1, 1, 2, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 2, 1, 1],
+  [ 0, 2, 2, 2, 2, 1, 2, 2, 2, 2, 1, 2, 2, 2, 2, 1, 2, 2, 2, 2, 0],
+  [ 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1],
+  [ 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],
+  [ 1, 2, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 2, 1],
+  [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 ];
 
-// 联通行（可以左右穿越的行）
 const TUNNEL_ROWS = new Set([6, 10, 18]);
+const GHOST_COLORS = ['#FF0000','#FFB8FF','#00FFFF','#FFB852'];
+
+// 每关鬼的数量
+const LEVEL_GHOST_COUNT = [1, 2, 3, 4];
+const MAX_LEVEL = 4;
 
 let map, score, lives, level, gameState;
-let pacman, ghosts, totalDots;
+let pacman, ghosts, totalDots, initialDots;
 let animFrame, globalTick;
-let pendingDir = null; // 玩家最新输入方向（只保留最新一个）
-
-const GHOST_COLORS = ['#FF0000','#FFB8FF','#00FFFF','#FFB852'];
+let pendingDir = null;
 
 // ── 初始化 ────────────────────────────────────────────────────────────────────
 function initGame() {
@@ -140,13 +136,16 @@ function initGame() {
   score = 0; lives = 3; level = 1;
   gameState = 'playing';
   pendingDir = null; globalTick = 0;
-  countDots(); spawnPacman(); spawnGhosts(); updateHUD();
+  countDots(); spawnPacman();
+  spawnGhosts(LEVEL_GHOST_COUNT[0]);
+  updateHUD();
 }
 
 function countDots() {
   totalDots = 0;
   for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++)
     if (map[r][c]===2||map[r][c]===3) totalDots++;
+  initialDots = totalDots;
 }
 
 function spawnPacman() {
@@ -154,30 +153,38 @@ function spawnPacman() {
   pendingDir = null;
 }
 
-function spawnGhosts() {
-  ghosts = [
-    mkGhost(10, 9,  {x:0,y:-1}, GHOST_COLORS[0], 30),
-    mkGhost(9,  10, {x:1,y:0},  GHOST_COLORS[1], 120),
-    mkGhost(10, 10, {x:-1,y:0}, GHOST_COLORS[2], 210),
-    mkGhost(11, 10, {x:0,y:1},  GHOST_COLORS[3], 300),
-  ];
-}
+// 鬼的固定起始位置（鬼屋出口上方等待，按顺序释放）
+const GHOST_SPAWNS = [
+  { col:10, row:9,  dir:{x:0,y:-1} }, // 第一只，最快出来
+  { col:9,  row:10, dir:{x:1,y:0}  },
+  { col:11, row:10, dir:{x:-1,y:0} },
+  { col:10, row:10, dir:{x:0,y:1}  },
+];
 
-function mkGhost(col, row, dir, color, releaseAt) {
-  return { col, row, dir, color,
-    scared:false, scaredTimer:0,
-    homeCol:col, homeRow:row,
-    releaseAt,           // globalTick 到这个值才释放
-    released: false,
-    moveTimer: 0,
-  };
+function spawnGhosts(count) {
+  ghosts = [];
+  for (let i=0; i<count; i++) {
+    const sp = GHOST_SPAWNS[i];
+    ghosts.push({
+      col: sp.col, row: sp.row,
+      dir: {...sp.dir},
+      color: GHOST_COLORS[i],
+      scared: false, scaredTimer: 0,
+      // 出生点（被吃后回这里）
+      spawnCol: sp.col, spawnRow: sp.row, spawnDir: {...sp.dir},
+      // 释放时刻
+      releaseAt: globalTick + 30 + i * 120,
+      released: i === 0, // 第一只立刻释放
+      moveTimer: 0,
+      id: i,
+    });
+  }
 }
 
 // ── 地图工具 ──────────────────────────────────────────────────────────────────
 function wrapCol(c) { return ((c % COLS) + COLS) % COLS; }
 
 function canMove(r, c, isGhost) {
-  // 水平穿越：只有在联通行才允许越界
   if (c < 0 || c >= COLS) {
     if (!TUNNEL_ROWS.has(r)) return false;
     c = wrapCol(c);
@@ -190,7 +197,7 @@ function canMove(r, c, isGhost) {
 }
 
 function actualCol(r, c) {
-  if (TUNNEL_ROWS.has(r)) return wrapCol(c);
+  if (c < 0 || c >= COLS) return wrapCol(c);
   return c;
 }
 
@@ -198,10 +205,8 @@ function actualCol(r, c) {
 function ghostOptions(g) {
   const all = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
   const rev = {x:-g.dir.x, y:-g.dir.y};
-  // 优先排除掉头
   let fwd = all.filter(d => !(d.x===rev.x&&d.y===rev.y) && canMove(g.row+d.y, g.col+d.x, true));
   if (fwd.length > 0) return fwd;
-  // 死路允许掉头
   return all.filter(d => canMove(g.row+d.y, g.col+d.x, true));
 }
 
@@ -210,8 +215,7 @@ function update() {
   if (gameState !== 'playing') return;
   globalTick++;
 
-  // ── Pacman 移动 ──
-  // 只处理 pendingDir，处理完立刻清空，不自动续走
+  // Pacman 移动（按一下走一格）
   if (pendingDir) {
     const d = pendingDir;
     pendingDir = null;
@@ -222,7 +226,6 @@ function update() {
       pacman.col = actualCol(nr, nc);
       pacman.facing = d;
     }
-    // 走不了就丢弃，不缓存
   }
 
   // 吃豆
@@ -230,18 +233,27 @@ function update() {
   if (cell === 2) { map[pacman.row][pacman.col]=0; score+=10; totalDots--; }
   if (cell === 3) {
     map[pacman.row][pacman.col]=0; score+=50; totalDots--;
-    ghosts.forEach(g => { if(g.released){g.scared=true; g.scaredTimer=200;} });
+    ghosts.forEach(g => {
+      if (g.released) { g.scared=true; g.scaredTimer=200; }
+    });
   }
 
-  // ── 鬼移动 ──
+  // 80% 豆子过关
+  if (totalDots <= Math.floor(initialDots * 0.2)) {
+    nextLevel();
+    return;
+  }
+
+  // 鬼移动
   const baseInterval = Math.max(5, 12 - (level-1)*2);
 
   ghosts.forEach(g => {
-    // 释放
+    // 释放逻辑
     if (!g.released) {
       if (globalTick >= g.releaseAt) {
         g.released = true;
-        g.row = 8; g.col = 10; g.dir = {x:0,y:-1};
+        // 传送到鬼屋出口
+        g.row = 7; g.col = 10; g.dir = {x:0,y:-1};
         g.moveTimer = 0;
       }
       return;
@@ -259,17 +271,14 @@ function update() {
 
     let chosen;
     if (g.scared) {
-      // 害怕时完全随机
       chosen = opts[Math.floor(Math.random()*opts.length)];
     } else {
-      // 在路口（≥2个选择）才重新选方向；直路继续直走
       const straight = opts.find(d => d.x===g.dir.x && d.y===g.dir.y);
-      if (opts.length === 1 || (straight && opts.length < 3)) {
-        // 直路或只有一条路，直走
-        chosen = straight || opts[0];
+      // 直路继续走，路口才决策
+      if (opts.length <= 2 && straight) {
+        chosen = straight;
       } else {
-        // 路口：80%追玩家，20%随机
-        if (Math.random() < 0.2) {
+        if (Math.random() < 0.15) {
           chosen = opts[Math.floor(Math.random()*opts.length)];
         } else {
           let best=null, bestDist=Infinity;
@@ -277,7 +286,7 @@ function update() {
             const dist = Math.abs(g.row+d.y-pacman.row)+Math.abs(g.col+d.x-pacman.col);
             if (dist < bestDist) { bestDist=dist; best=d; }
           });
-          chosen = best;
+          chosen = best || opts[0];
         }
       }
     }
@@ -289,14 +298,16 @@ function update() {
     }
   });
 
-  // ── 碰撞 ──
+  // 碰撞检测
   ghosts.forEach(g => {
     if (!g.released) return;
     if (g.row===pacman.row && g.col===pacman.col) {
       if (g.scared) {
+        // 吃鬼：回出生点，等待重新释放
         g.scared=false; g.scaredTimer=0;
-        g.released=false; g.releaseAt=globalTick+120;
-        g.row=g.homeRow; g.col=g.homeCol;
+        g.col=g.spawnCol; g.row=g.spawnRow; g.dir={...g.spawnDir};
+        g.released=false;
+        g.releaseAt=globalTick+180;
         score+=200;
       } else {
         loseLife();
@@ -304,36 +315,47 @@ function update() {
     }
   });
 
-  // 嘴巴
+  // 嘴巴动画
   pacman.mouth += 0.17 * pacman.mouthDir;
   if (pacman.mouth>0.27) pacman.mouthDir=-1;
   if (pacman.mouth<0.01) pacman.mouthDir=1;
 
-  if (totalDots<=0) nextLevel();
   updateHUD();
 }
 
 function loseLife() {
   lives--;
   updateHUD();
-  if (lives<=0) { gameState='gameover'; setTimeout(()=>showOverlay('gameover'),500); return; }
+  if (lives<=0) {
+    gameState='gameover';
+    setTimeout(()=>showOverlay('gameover'),500);
+    return;
+  }
   spawnPacman();
   ghosts.forEach((g,i) => {
     g.released=false; g.scared=false; g.scaredTimer=0;
-    g.row=g.homeRow; g.col=g.homeCol; g.moveTimer=0;
-    g.releaseAt = globalTick + 30 + i*90;
+    g.col=g.spawnCol; g.row=g.spawnRow; g.dir={...g.spawnDir};
+    g.moveTimer=0;
+    g.releaseAt=globalTick+30+i*120;
   });
 }
 
 function nextLevel() {
+  if (level >= MAX_LEVEL) {
+    gameState='win';
+    setTimeout(()=>showOverlay('win'),500);
+    return;
+  }
   level++;
   map=MAP_TEMPLATE.map(r=>[...r]);
-  countDots(); spawnPacman(); spawnGhosts();
+  countDots(); spawnPacman();
+  spawnGhosts(LEVEL_GHOST_COUNT[level-1]);
+  updateHUD();
 }
 
 function updateHUD() {
   document.getElementById('sd').textContent = score;
-  document.getElementById('ld').textContent = level;
+  document.getElementById('ld').textContent = level+'/'+MAX_LEVEL;
   document.getElementById('vd').textContent = '❤️'.repeat(Math.max(0,lives));
 }
 
@@ -359,6 +381,13 @@ function draw() {
     }
   }
 
+  // 联通通道提示
+  TUNNEL_ROWS.forEach(r => {
+    ctx.fillStyle='rgba(255,255,100,0.12)';
+    ctx.fillRect(0, r*TILE, TILE, TILE);
+    ctx.fillRect((COLS-1)*TILE, r*TILE, TILE, TILE);
+  });
+
   // 鬼屋门
   ctx.strokeStyle='#FFB8DE'; ctx.lineWidth=2;
   ctx.beginPath();
@@ -366,12 +395,16 @@ function draw() {
   ctx.lineTo(12*TILE,9*TILE+TILE/2);
   ctx.stroke();
 
-  // 联通通道指示（左右两端画小箭头提示）
-  TUNNEL_ROWS.forEach(r => {
-    ctx.fillStyle='rgba(255,255,100,0.25)';
-    ctx.fillRect(0, r*TILE, TILE, TILE);
-    ctx.fillRect((COLS-1)*TILE, r*TILE, TILE, TILE);
-  });
+  // 进度条（80%目标）
+  const pct = 1 - totalDots / initialDots;
+  const barW = canvas.width - 4;
+  ctx.fillStyle='#333';
+  ctx.fillRect(2, canvas.height-4, barW, 4);
+  ctx.fillStyle = pct >= 0.8 ? '#00ff88' : '#FFD700';
+  ctx.fillRect(2, canvas.height-4, barW*Math.min(pct,1), 4);
+  // 80%刻度线
+  ctx.fillStyle='#fff';
+  ctx.fillRect(2 + barW*0.8 - 1, canvas.height-6, 2, 6);
 
   // Pacman
   const px=pacman.col*TILE+TILE/2, py=pacman.row*TILE+TILE/2;
@@ -381,32 +414,28 @@ function draw() {
   ctx.beginPath(); ctx.moveTo(px,py);
   ctx.arc(px,py,TILE*0.43,angle+mo,angle+Math.PI*2-mo);
   ctx.closePath(); ctx.fill();
-  // 眼
   const ex=px+Math.cos(angle-0.5)*TILE*0.18;
   const ey=py+Math.sin(angle-0.5)*TILE*0.18;
   ctx.fillStyle='#000';
   ctx.beginPath(); ctx.arc(ex,ey,TILE*0.06,0,Math.PI*2); ctx.fill();
 
-  // 鬼
+  // 鬼（只画已释放的）
   ghosts.forEach(g => {
     if (!g.released) return;
     const gx=g.col*TILE+TILE/2, gy=g.row*TILE+TILE/2;
     const R=TILE*0.43;
     const flicker=g.scared&&g.scaredTimer<60&&globalTick%14<7;
-    ctx.fillStyle = g.scared ? (flicker?'#fff':'#2233ff') : g.color;
-    // 身体
+    ctx.fillStyle = g.scared ? (flicker?'#aaaaff':'#2233ff') : g.color;
     ctx.beginPath();
     ctx.arc(gx,gy-R*0.1,R,Math.PI,0);
     ctx.lineTo(gx+R,gy+R*0.85);
-    const segs=3;
-    for(let i=0;i<segs;i++){
-      const x1=gx+R-i*(R*2/segs);
-      const x2=gx+R-(i+1)*(R*2/segs);
-      ctx.quadraticCurveTo((x1+x2)/2-R*0.05,gy+R*1.15,(x1+x2)/2,gy+R*0.85);
+    for(let i=0;i<3;i++){
+      const x1=gx+R-i*(R*2/3);
+      const x2=gx+R-(i+1)*(R*2/3);
+      ctx.quadraticCurveTo((x1+x2)/2,gy+R*1.18,(x1+x2)/2,gy+R*0.85);
     }
     ctx.lineTo(gx-R,gy+R*0.85);
     ctx.closePath(); ctx.fill();
-    // 眼
     if(!g.scared){
       [-0.17,0.17].forEach(ox=>{
         ctx.fillStyle='#fff';
@@ -418,9 +447,9 @@ function draw() {
       ctx.strokeStyle='#fff'; ctx.lineWidth=1.5;
       ctx.beginPath();
       ctx.moveTo(gx-R*0.3,gy-R*0.15);
-      ctx.lineTo(gx-R*0.1,gy-R*0.0);
+      ctx.lineTo(gx-R*0.1,gy);
       ctx.lineTo(gx+R*0.1,gy-R*0.15);
-      ctx.lineTo(gx+R*0.3,gy-R*0.0);
+      ctx.lineTo(gx+R*0.3,gy);
       ctx.stroke();
     }
   });
@@ -435,7 +464,13 @@ function showOverlay(type) {
   if(type==='gameover'){
     ov.innerHTML=`<h1>💀 遊戲結束</h1>
       <div class="sc">最終分數：${score}</div>
-      <p>關卡 ${level} 到達</p>
+      <p>到達第 ${level} 關</p>
+      <button class="obtn" id="rb">再玩一次</button>`;
+    document.getElementById('rb').addEventListener('click',startGame);
+  } else if(type==='win'){
+    ov.innerHTML=`<h1>🎉 恭喜通關！</h1>
+      <div class="sc">總分：${score}</div>
+      <p>四關全部完成！</p>
       <button class="obtn" id="rb">再玩一次</button>`;
     document.getElementById('rb').addEventListener('click',startGame);
   }
@@ -449,32 +484,22 @@ function startGame() {
 document.getElementById('start-btn').addEventListener('click',startGame);
 
 // ── 控制 ──────────────────────────────────────────────────────────────────────
-// 只保留最新一个方向，不缓存队列，不自动续走
-const KEY_DIRS = {
-  ArrowUp:{x:0,y:-1}, ArrowDown:{x:0,y:1},
-  ArrowLeft:{x:-1,y:0}, ArrowRight:{x:1,y:0},
-};
-function setDir(d) { if(pacman&&gameState==='playing') pendingDir=d; }
-
-document.addEventListener('keydown', e => {
-  if(KEY_DIRS[e.key]){ e.preventDefault(); setDir(KEY_DIRS[e.key]); }
-});
-document.getElementById('btn-up').addEventListener('click',    ()=>setDir({x:0,y:-1}));
-document.getElementById('btn-down').addEventListener('click',  ()=>setDir({x:0,y:1}));
-document.getElementById('btn-left').addEventListener('click',  ()=>setDir({x:-1,y:0}));
-document.getElementById('btn-right').addEventListener('click', ()=>setDir({x:1,y:0}));
-
-// 滑动
+const KEY_DIRS={ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1},ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0}};
+function setDir(d){ if(pacman&&gameState==='playing') pendingDir=d; }
+document.addEventListener('keydown',e=>{ if(KEY_DIRS[e.key]){e.preventDefault();setDir(KEY_DIRS[e.key]);} });
+document.getElementById('btn-up').addEventListener('click',()=>setDir({x:0,y:-1}));
+document.getElementById('btn-down').addEventListener('click',()=>setDir({x:0,y:1}));
+document.getElementById('btn-left').addEventListener('click',()=>setDir({x:-1,y:0}));
+document.getElementById('btn-right').addEventListener('click',()=>setDir({x:1,y:0}));
 let tx0=0,ty0=0;
 document.addEventListener('touchstart',e=>{tx0=e.touches[0].clientX;ty0=e.touches[0].clientY;},{passive:true});
 document.addEventListener('touchend',e=>{
-  const dx=e.changedTouches[0].clientX-tx0, dy=e.changedTouches[0].clientY-ty0;
-  if(Math.abs(dx)<18&&Math.abs(dy)<18) return;
-  if(Math.abs(dx)>Math.abs(dy)) setDir(dx>0?{x:1,y:0}:{x:-1,y:0});
+  const dx=e.changedTouches[0].clientX-tx0,dy=e.changedTouches[0].clientY-ty0;
+  if(Math.abs(dx)<18&&Math.abs(dy)<18)return;
+  if(Math.abs(dx)>Math.abs(dy))setDir(dx>0?{x:1,y:0}:{x:-1,y:0});
   else setDir(dy>0?{x:0,y:1}:{x:0,y:-1});
 },{passive:true});
-
-window.addEventListener('resize',()=>{if(gameState==='playing') resize();});
+window.addEventListener('resize',()=>{if(gameState==='playing')resize();});
 resize();
 </script>
 </body>
