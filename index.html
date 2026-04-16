@@ -2,10 +2,11 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="HandheldFriendly" content="true">
 <title>吃豆人</title>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
+* { margin:0; padding:0; box-sizing:border-box; touch-action:manipulation; }
 body {
   background:#000;
   display:flex;
@@ -184,11 +185,17 @@ function makeGhost(col, row, dir, color, releaseDelay) {
   };
 }
 
+// 水平方向允许环绕（左右穿墙）
+function wrapCol(c) {
+  return ((c % COLS) + COLS) % COLS;
+}
+
 function isWalkable(r, c, isGhost) {
-  if (r<0||r>=ROWS||c<0||c>=COLS) return false;
+  if (r < 0 || r >= ROWS) return false;
+  c = wrapCol(c);
   const t = map[r][c];
-  if (t===1) return false;
-  if (!isGhost && t===4) return false;
+  if (t === 1) return false;
+  if (!isGhost && t === 4) return false;
   return true;
 }
 
@@ -217,7 +224,7 @@ function update() {
   if (moveQueue.length > 0) {
     const nd = moveQueue.shift();
     const nr = pacman.row + nd.y;
-    const nc = ((pacman.col + nd.x) % COLS + COLS) % COLS;
+    const nc = wrapCol(pacman.col + nd.x);
     if (isWalkable(nr, nc, false)) {
       pacman.row = nr;
       pacman.col = nc;
@@ -292,7 +299,7 @@ function update() {
     if (chosen) {
       g.dir = chosen;
       g.row += chosen.y;
-      g.col = ((g.col + chosen.x) % COLS + COLS) % COLS;
+      g.col = wrapCol(g.col + chosen.x);
     }
   });
 
