@@ -154,11 +154,13 @@ function spawnPacman() {
 }
 
 // 鬼的固定起始位置（鬼屋出口上方等待，按顺序释放）
+// 所有鬼都在鬼屋出口外等待，不放进鬼屋里
+// row=6 col=10 是出口正上方的走道
 const GHOST_SPAWNS = [
-  { col:10, row:9,  dir:{x:0,y:-1} }, // 第一只，最快出来
-  { col:9,  row:10, dir:{x:1,y:0}  },
-  { col:11, row:10, dir:{x:-1,y:0} },
-  { col:10, row:10, dir:{x:0,y:1}  },
+  { col:10, row:6, dir:{x:1,  y:0} },
+  { col:10, row:6, dir:{x:-1, y:0} },
+  { col:10, row:6, dir:{x:1,  y:0} },
+  { col:10, row:6, dir:{x:-1, y:0} },
 ];
 
 function spawnGhosts(count) {
@@ -170,11 +172,11 @@ function spawnGhosts(count) {
       dir: {...sp.dir},
       color: GHOST_COLORS[i],
       scared: false, scaredTimer: 0,
-      // 出生点（被吃后回这里）
+      // 被吃后回出口等待
       spawnCol: sp.col, spawnRow: sp.row, spawnDir: {...sp.dir},
-      // 释放时刻
-      releaseAt: globalTick + 30 + i * 120,
-      released: i === 0, // 第一只立刻释放
+      // 第一只立刻出来，其余依次延迟
+      releaseAt: globalTick + i * 150,
+      released: false,
       moveTimer: 0,
       id: i,
     });
@@ -248,12 +250,10 @@ function update() {
   const baseInterval = Math.max(5, 12 - (level-1)*2);
 
   ghosts.forEach(g => {
-    // 释放逻辑
+    // 释放逻辑：时间到直接标记为释放，原地开始移动
     if (!g.released) {
       if (globalTick >= g.releaseAt) {
         g.released = true;
-        // 传送到鬼屋出口
-        g.row = 7; g.col = 10; g.dir = {x:0,y:-1};
         g.moveTimer = 0;
       }
       return;
