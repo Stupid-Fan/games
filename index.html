@@ -128,7 +128,9 @@ const MAX_LEVEL = 4;
 let map, score, lives, level, gameState;
 let pacman, ghosts, totalDots, initialDots;
 let animFrame, globalTick;
-let pendingDir = null;
+let heldDir = null;      // 当前按住的方向（松开变null）
+let pacMoveTimer = 0;   // pacman移动节奏计时器
+const PAC_INTERVAL = 8; // 每8帧走一格（约133ms @60fps）
 
 // ── 初始化 ────────────────────────────────────────────────────────────────────
 function initGame() {
@@ -136,6 +138,7 @@ function initGame() {
   score = 0; lives = 3; level = 1;
   gameState = 'playing';
   pendingDir = null; globalTick = 0;
+  heldDir = null; pacMoveTimer = 0;
   countDots(); spawnPacman();
   spawnGhosts(LEVEL_GHOST_COUNT[0]);
   updateHUD();
@@ -150,7 +153,7 @@ function countDots() {
 
 function spawnPacman() {
   pacman = { col:10, row:16, facing:{x:1,y:0}, mouth:0, mouthDir:1 };
-  pendingDir = null;
+  heldDir = null; pacMoveTimer = 0;
 }
 
 // 鬼的固定起始位置（鬼屋出口上方等待，按顺序释放）
@@ -217,17 +220,22 @@ function update() {
   if (gameState !== 'playing') return;
   globalTick++;
 
-  // Pacman 移动（按一下走一格）
-  if (pendingDir) {
-    const d = pendingDir;
-    pendingDir = null;
-    const nr = pacman.row + d.y;
-    const nc = pacman.col + d.x;
-    if (canMove(nr, nc, false)) {
-      pacman.row = nr;
-      pacman.col = actualCol(nr, nc);
-      pacman.facing = d;
+  // Pacman 移动：按住持续走，放开停止，每PAC_INTERVAL帧走一格
+  if (heldDir) {
+    pacMoveTimer++;
+    if (pacMoveTimer >= PAC_INTERVAL) {
+      pacMoveTimer = 0;
+      const d = heldDir;
+      const nr = pacman.row + d.y;
+      const nc = pacman.col + d.x;
+      if (canMove(nr, nc, false)) {
+        pacman.row = nr;
+        pacman.col = actualCol(nr, nc);
+        pacman.facing = d;
+      }
     }
+  } else {
+    pacMoveTimer = 0;
   }
 
   // 吃豆
@@ -485,19 +493,39 @@ document.getElementById('start-btn').addEventListener('click',startGame);
 
 // ── 控制 ──────────────────────────────────────────────────────────────────────
 const KEY_DIRS={ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1},ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0}};
-function setDir(d){ if(pacman&&gameState==='playing') pendingDir=d; }
-document.addEventListener('keydown',e=>{ if(KEY_DIRS[e.key]){e.preventDefault();setDir(KEY_DIRS[e.key]);} });
-document.getElementById('btn-up').addEventListener('click',()=>setDir({x:0,y:-1}));
-document.getElementById('btn-down').addEventListener('click',()=>setDir({x:0,y:1}));
-document.getElementById('btn-left').addEventListener('click',()=>setDir({x:-1,y:0}));
-document.getElementById('btn-right').addEventListener('click',()=>setDir({x:1,y:0}));
+
+function setDir(d){ if(pacman&&gameState==='playing'){ heldDir=d; pacMoveTimer=PAC_INTERVAL; } }
+function clearDir(d){ if(heldDir&&d&&heldDir.x===d.x&&heldDir.y===d.y) heldDir=null; }
+
+// 键盘：按下设方向，松开清除
+document.addEventListener('keydown',e=>{
+  if(KEY_DIRS[e.key]){ e.preventDefault(); setDir(KEY_DIRS[e.key]); }
+});
+document.addEventListener('keyup',e=>{
+  if(KEY_DIRS[e.key]) clearDir(KEY_DIRS[e.key]);
+});
+
+// 手机按钮：按下持续走，松开停
+document.getElementById('btn-up').addEventListener('pointerdown',   ()=>setDir({x:0,y:-1}));
+document.getElementById('btn-down').addEventListener('pointerdown',  ()=>setDir({x:0,y:1}));
+document.getElementById('btn-left').addEventListener('pointerdown',  ()=>setDir({x:-1,y:0}));
+document.getElementById('btn-right').addEventListener('pointerdown', ()=>setDir({x:1,y:0}));
+['btn-up','btn-down','btn-left','btn-right'].forEach(id=>{
+  const el=document.getElementById(id);
+  el.addEventListener('pointerup',  ()=>{ heldDir=null; });
+  el.addEventListener('pointerleave',()=>{ heldDir=null; });
+});
+
+// 滑动（仍然支持）
 let tx0=0,ty0=0;
 document.addEventListener('touchstart',e=>{tx0=e.touches[0].clientX;ty0=e.touches[0].clientY;},{passive:true});
 document.addEventListener('touchend',e=>{
   const dx=e.changedTouches[0].clientX-tx0,dy=e.changedTouches[0].clientY-ty0;
-  if(Math.abs(dx)<18&&Math.abs(dy)<18)return;
-  if(Math.abs(dx)>Math.abs(dy))setDir(dx>0?{x:1,y:0}:{x:-1,y:0});
+  if(Math.abs(dx)<18&&Math.abs(dy)<18){ heldDir=null; return; }
+  if(Math.abs(dx)>Math.abs(dy)) setDir(dx>0?{x:1,y:0}:{x:-1,y:0});
   else setDir(dy>0?{x:0,y:1}:{x:0,y:-1});
+  // 滑动松手后停止
+  setTimeout(()=>{ heldDir=null; }, 150);
 },{passive:true});
 window.addEventListener('resize',()=>{if(gameState==='playing')resize();});
 resize();
